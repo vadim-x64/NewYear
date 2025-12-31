@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Новорічна Анімація</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            overflow: hidden;
+            background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
+            font-family: Arial, sans-serif;
+            cursor: default;
+            position: relative;
+        }
+
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        #stringCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .anchor {
+            position: absolute;
+            top: 0;
+            width: 30px;
+            height: 30px;
+            background: radial-gradient(circle, #ffd700 0%, #daa520 100%);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 2;
+            box-shadow: 0 2px 10px rgba(255, 215, 0, 0.6);
+            border: 3px solid #b8860b;
+        }
+
+        .candy-container {
+            position: absolute;
+            transform-origin: center center;
+            z-index: 3;
+            cursor: grab;
+            transition: filter 0.2s;
+            will-change: transform;
+        }
+
+        .candy-container img {
+            width: 100px;
+        }
+
+        .candy-container:active {
+            cursor: grabbing;
+        }
+
+        .candy-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+    </style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<canvas id="stringCanvas"></canvas>
+<div class="anchor" id="anchor"></div>
+<div class="candy-container" id="candyContainer">
+    <img src="src/assets/icon.png"
+         alt="Candy"
+         class="candy-img"
+         id="candyImg"
+         draggable="false">
+</div>
+
+<script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const stringCanvas = document.getElementById('stringCanvas');
+    const stringCtx = stringCanvas.getContext('2d');
+    const candyContainer = document.getElementById('candyContainer');
+    const candyImg = document.getElementById('candyImg');
+    const anchor = document.getElementById('anchor');
+
+    // Налаштування canvas
+    function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        stringCanvas.width = window.innerWidth;
+        stringCanvas.height = window.innerHeight;
+    }
+    resizeCanvas();
+
+    // Фізичні параметри
+    const anchorX = canvas.width / 2;
+    const anchorY = 30;
+    const stringLength = 250;
+
+    // Параметри маятника
+    let angle = (Math.random() - 0.5) * 0.3;
+    let angleVelocity = (Math.random() - 0.5) * 0.05;
+    const angleAcceleration = 0.0008;
+    const angleDamping = 0.996;
+
+    const confettiPullThreshold = 100;
+
+    // Параметри нитки
+    const stringSegments = 20;
+    const stringPoints = [];
+
+    // Ініціалізація точок нитки
+    for (let i = 0; i <= stringSegments; i++) {
+        stringPoints.push({
+            x: anchorX,
+            y: anchorY + (stringLength / stringSegments) * i,
+            vx: 0,
+            vy: 0,
+            prevX: anchorX,
+            prevY: anchorY + (stringLength / stringSegments) * i
+        });
+    }
+
+    let posX = anchorX;
+    let posY = anchorY + stringLength;
+    let velocityX = 0;
+    let velocityY = 0;
+    let isDragging = false;
+    let dragOffsetX = 0;
+    let dragOffsetY = 0;
+    let lastMouseX = 0;
+    let lastMouseY = 0;
+    let mouseVelocityX = 0;
+    let mouseVelocityY = 0;
+
+    let candyTilt = 0;
+    let lastPosX = posX;
+    let lastPosY = posY;
+
+    // Масив конфетті
+    let confetti = [];
+    let confettiTriggered = false;
+    let wasStretched = false;
+
+    // Встановлення початкової позиції
+    anchor.style.left = anchorX + 'px';
+    anchor.style.top = anchorY + 'px';
+
+    // Обчислення позиції з кута
+    function updatePositionFromAngle() {
+        const targetX = anchorX + Math.sin(angle) * stringLength;
+        const targetY = anchorY + Math.cos(angle) * stringLength;
+
+        posX += (targetX - posX) * 0.3;
+        posY += (targetY - posY) * 0.3;
+    }
+
+    // Початкова позиція
+    updatePositionFromAngle();
+
+    // Обробка миші (ЛКМ)
+    candyContainer.addEventListener('mousedown', (e) => {
+        if (e.button === 0) {
+            isDragging = true;
+            const rect = candyContainer.getBoundingClientRect();
+            dragOffsetX = e.clientX - rect.left - rect.width / 2;
+            dragOffsetY = e.clientY - rect.top - rect.height / 2;
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
+            mouseVelocityX = 0;
+            mouseVelocityY = 0;
+            velocityX = 0;
+            velocityY = 0;
+            confettiTriggered = false;
+            wasStretched = false;
+        }
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (isDragging) {
+            const currentVelX = e.clientX - lastMouseX;
+            const currentVelY = e.clientY - lastMouseY;
+
+            mouseVelocityX = mouseVelocityX * 0.7 + currentVelX * 0.3;
+            mouseVelocityY = mouseVelocityY * 0.7 + currentVelY * 0.3;
+
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
+
+            const targetX = e.clientX - dragOffsetX;
+            const targetY = e.clientY - dragOffsetY;
+
+            const dx = targetX - anchorX;
+            const dy = targetY - anchorY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            const maxStretch = stringLength * 1.5;
+            if (distance > maxStretch) {
+                posX = anchorX + (dx / distance) * maxStretch;
+                posY = anchorY + (dy / distance) * maxStretch;
+                wasStretched = true;
+            } else {
+                posX += (targetX - posX) * 0.3;
+                posY += (targetY - posY) * 0.3;
+            }
+
+            // Перевірка на конфетті
+            const pullDistance = posY - (anchorY + stringLength);
+            if (pullDistance > confettiPullThreshold && !confettiTriggered) {
+                createConfettiBurst();
+                confettiTriggered = true;
+                velocityY = -8;
+                velocityX = (Math.random() - 0.5) * 4;
+            }
+
+            updatePosition();
+        }
+    });
+
+    document.addEventListener('mouseup', (e) => {
+        if (e.button === 0 && isDragging) {
+            isDragging = false;
+
+            const dx = posX - anchorX;
+            const dy = posY - anchorY;
+
+            const currentDistance = Math.sqrt(dx * dx + dy * dy);
+            if (currentDistance > stringLength * 1.2 || wasStretched) {
+                const normalizedX = anchorX + (dx / currentDistance) * stringLength;
+                const normalizedY = anchorY + (dy / currentDistance) * stringLength;
+
+                velocityX = (normalizedX - posX) * 0.3 + mouseVelocityX * 0.8;
+                velocityY = (normalizedY - posY) * 0.3 + mouseVelocityY * 0.8;
+            } else {
+                velocityX = mouseVelocityX * 0.8;
+                velocityY = mouseVelocityY * 0.8;
+            }
+
+            angle = Math.atan2(dx, dy);
+
+            const tangentialVelocity = velocityX * Math.cos(angle) - velocityY * Math.sin(angle);
+            angleVelocity = tangentialVelocity / stringLength;
+
+            angleVelocity += (Math.random() - 0.5) * 0.008;
+        }
+    });
+
+    // Функція створення вибуху конфетті
+    function createConfettiBurst() {
+        const colors = [
+            '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A',
+            '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E2',
+            '#F8B739', '#52B788', '#FF6B9D', '#C9A0DC'
+        ];
+        const shapes = ['circle', 'square', 'triangle', 'star', 'heart', 'diamond'];
+
+        // Ліва сторона
+        for (let i = 0; i < 150; i++) {
+            const angle = Math.random() * Math.PI / 2.5 - Math.PI / 8;
+            const speed = Math.random() * 6 + 4;
+            confetti.push({
+                x: 0,
+                y: Math.random() * canvas.height * 0.6 + canvas.height * 0.2,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed - Math.random() * 3,
+                gravity: 0.15,
+                size: Math.random() * 12 + 6,
+                color: colors[Math.floor(Math.random() * colors.length)],
+                shape: shapes[Math.floor(Math.random() * shapes.length)],
+                rotation: Math.random() * 360,
+                rotationSpeed: Math.random() * 10 - 5,
+                opacity: 1,
+                life: 240 + Math.random() * 120,
+                maxLife: 240 + Math.random() * 120,
+                wobble: Math.random() * 1.5 - 0.75
+            });
+        }
+
+        // Права сторона
+        for (let i = 0; i < 150; i++) {
+            const angle = Math.PI - (Math.random() * Math.PI / 2.5 - Math.PI / 8);
+            const speed = Math.random() * 6 + 4;
+            confetti.push({
+                x: canvas.width,
+                y: Math.random() * canvas.height * 0.6 + canvas.height * 0.2,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed - Math.random() * 3,
+                gravity: 0.15,
+                size: Math.random() * 12 + 6,
+                color: colors[Math.floor(Math.random() * colors.length)],
+                shape: shapes[Math.floor(Math.random() * shapes.length)],
+                rotation: Math.random() * 360,
+                rotationSpeed: Math.random() * 10 - 5,
+                opacity: 1,
+                life: 240 + Math.random() * 120,
+                maxLife: 240 + Math.random() * 120,
+                wobble: Math.random() * 1.5 - 0.75
+            });
+        }
+    }
+
+    // Оновлення гнучкої нитки
+    function updateString() {
+        stringPoints[0].x = anchorX;
+        stringPoints[0].y = anchorY;
+
+        stringPoints[stringSegments].x = posX;
+        stringPoints[stringSegments].y = posY;
+
+        for (let i = 1; i < stringSegments; i++) {
+            const point = stringPoints[i];
+
+            const tempX = point.x;
+            const tempY = point.y;
+
+            point.x += (point.x - point.prevX) * 0.99;
+            point.y += (point.y - point.prevY) * 0.99;
+            point.y += 0.12;
+
+            point.prevX = tempX;
+            point.prevY = tempY;
+        }
+
+        for (let iter = 0; iter < 5; iter++) {
+            for (let i = 0; i < stringSegments; i++) {
+                const p1 = stringPoints[i];
+                const p2 = stringPoints[i + 1];
+
+                const dx = p2.x - p1.x;
+                const dy = p2.y - p1.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const segmentLength = stringLength / stringSegments;
+                const difference = (distance - segmentLength) / distance;
+
+                const offsetX = dx * difference * 0.5;
+                const offsetY = dy * difference * 0.5;
+
+                if (i > 0) {
+                    p1.x += offsetX;
+                    p1.y += offsetY;
+                }
+
+                if (i < stringSegments - 1) {
+                    p2.x -= offsetX;
+                    p2.y -= offsetY;
+                }
+            }
+        }
+    }
+
+    // Малювання гнучкої нитки
+    function drawString() {
+        stringCtx.clearRect(0, 0, stringCanvas.width, stringCanvas.height);
+
+        stringCtx.beginPath();
+        stringCtx.moveTo(stringPoints[0].x, stringPoints[0].y);
+
+        for (let i = 0; i < stringSegments; i++) {
+            const p1 = stringPoints[i];
+            const p2 = stringPoints[i + 1];
+            const midX = (p1.x + p2.x) / 2;
+            const midY = (p1.y + p2.y) / 2;
+
+            stringCtx.quadraticCurveTo(p1.x, p1.y, midX, midY);
+        }
+
+        // const lastPoint = stringPoints[stringSegments];
+        // stringCtx.lineTo(lastPoint.x, lastPoint.y);
+
+        stringCtx.strokeStyle = 'rgba(255, 215, 0, 0.8)';
+        stringCtx.lineWidth = 3;
+        stringCtx.lineCap = 'round';
+        stringCtx.shadowBlur = 10;
+        stringCtx.shadowColor = 'rgba(255, 215, 0, 0.5)';
+        stringCtx.stroke();
+    }
+
+    // Оновлення динаміки цукерки
+    function updateCandyPhysics() {
+        const moveSpeedX = posX - lastPosX;
+        const moveSpeedY = posY - lastPosY;
+
+        lastPosX = posX;
+        lastPosY = posY;
+
+        // Обчислюємо нахил на основі швидкості
+        const targetTilt = moveSpeedX * 2;
+        candyTilt += (targetTilt - candyTilt) * 0.15;
+
+        // Обмежуємо нахил
+        candyTilt = Math.max(-45, Math.min(45, candyTilt));
+    }
+
+    // Оновлення позиції цукерки
+    function updatePosition() {
+        updateCandyPhysics();
+
+        candyContainer.style.left = (posX - 50) + 'px';
+        candyContainer.style.top = (posY - 50) + 'px';
+
+        // Застосовуємо тільки нахил
+        candyContainer.style.transform = `rotate(${candyTilt - 200}deg)`;
+    }
+
+    // Малювання конфетті
+    function drawConfetti(particle) {
+        ctx.save();
+        ctx.translate(particle.x, particle.y);
+        ctx.rotate(particle.rotation * Math.PI / 180);
+        ctx.globalAlpha = particle.opacity;
+        ctx.fillStyle = particle.color;
+        ctx.strokeStyle = particle.color;
+        ctx.lineWidth = 2;
+
+        const size = particle.size;
+
+        switch(particle.shape) {
+            case 'circle':
+                ctx.beginPath();
+                ctx.arc(0, 0, size, 0, Math.PI * 2);
+                ctx.fill();
+                break;
+
+            case 'square':
+                ctx.fillRect(-size, -size, size * 2, size * 2);
+                break;
+
+            case 'triangle':
+                ctx.beginPath();
+                ctx.moveTo(0, -size * 1.2);
+                ctx.lineTo(size * 1.2, size * 1.2);
+                ctx.lineTo(-size * 1.2, size * 1.2);
+                ctx.closePath();
+                ctx.fill();
+                break;
+
+            case 'star':
+                drawStar(0, 0, 5, size * 1.3, size * 0.6);
+                break;
+
+            case 'heart':
+                drawHeart(size);
+                break;
+
+            case 'diamond':
+                ctx.beginPath();
+                ctx.moveTo(0, -size * 1.3);
+                ctx.lineTo(size * 0.8, 0);
+                ctx.lineTo(0, size * 1.3);
+                ctx.lineTo(-size * 0.8, 0);
+                ctx.closePath();
+                ctx.fill();
+                break;
+        }
+
+        ctx.restore();
+    }
+
+    function drawStar(cx, cy, spikes, outerRadius, innerRadius) {
+        let rot = Math.PI / 2 * 3;
+        const step = Math.PI / spikes;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - outerRadius);
+
+        for (let i = 0; i < spikes; i++) {
+            let x = cx + Math.cos(rot) * outerRadius;
+            let y = cy + Math.sin(rot) * outerRadius;
+            ctx.lineTo(x, y);
+            rot += step;
+            x = cx + Math.cos(rot) * innerRadius;
+            y = cy + Math.sin(rot) * innerRadius;
+            ctx.lineTo(x, y);
+            rot += step;
+        }
+        ctx.lineTo(cx, cy - outerRadius);
+        ctx.closePath();
+        ctx.fill();
+    }
+
+    function drawHeart(size) {
+        ctx.beginPath();
+        ctx.moveTo(0, size * 0.3);
+        ctx.bezierCurveTo(-size * 1.2, -size * 0.6, -size * 1.8, size * 0.5, 0, size * 1.5);
+        ctx.bezierCurveTo(size * 1.8, size * 0.5, size * 1.2, -size * 0.6, 0, size * 0.3);
+        ctx.closePath();
+        ctx.fill();
+    }
+
+    // Головний цикл анімації
+    function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (!isDragging) {
+            if (Math.abs(velocityX) > 0.01 || Math.abs(velocityY) > 0.01) {
+                posX += velocityX;
+                posY += velocityY;
+
+                velocityX *= 0.95;
+                velocityY *= 0.95;
+
+                velocityY += 0.3;
+
+                const dx = posX - anchorX;
+                const dy = posY - anchorY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance > stringLength) {
+                    posX = anchorX + (dx / distance) * stringLength;
+                    posY = anchorY + (dy / distance) * stringLength;
+
+                    angle = Math.atan2(dx, dy);
+                    const tangentialVelocity = velocityX * Math.cos(angle) - velocityY * Math.sin(angle);
+                    angleVelocity = tangentialVelocity / stringLength;
+
+                    velocityX = 0;
+                    velocityY = 0;
+                }
+            } else {
+                const angularAcceleration = -angleAcceleration * Math.sin(angle);
+                angleVelocity += angularAcceleration;
+                angleVelocity *= angleDamping;
+                angle += angleVelocity;
+
+                if (Math.abs(angleVelocity) > 0.001) {
+                    angle += (Math.random() - 0.5) * 0.0003;
+                }
+
+                updatePositionFromAngle();
+            }
+
+            updatePosition();
+        }
+
+        updateString();
+        drawString();
+
+        // Оновлення конфетті
+        confetti = confetti.filter(particle => {
+            particle.vy += particle.gravity;
+            particle.vx += particle.wobble * 0.05;
+            particle.x += particle.vx;
+            particle.y += particle.vy;
+            particle.rotation += particle.rotationSpeed;
+            particle.life--;
+
+            if (particle.life < 90) {
+                particle.opacity = particle.life / 90;
+            }
+
+            drawConfetti(particle);
+
+            return particle.life > 0 &&
+                particle.y < canvas.height + 100 &&
+                particle.x > -100 &&
+                particle.x < canvas.width + 100;
+        });
+
+        requestAnimationFrame(animate);
+    }
+
+    // Зміна розміру вікна
+    window.addEventListener('resize', () => {
+        resizeCanvas();
+    });
+
+    // Запуск анімації
+    animate();
+</script>
+</body>
+</html>
