@@ -368,7 +368,6 @@ body.loaded {
     }
 
     #closeHint {
-        bottom: 170px;
         font-size: 12px;
         padding: 0 20px;
         width: 80%;
