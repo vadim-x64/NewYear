@@ -12,14 +12,21 @@
             user-select: none;
             font-family: 'Comic Sans MS', sans-serif;
         }
+        html {
+            overflow: hidden;
+            height: 100%;
+        }
 
         body {
             overflow: hidden;
             background: #FFFFFF;
             cursor: default;
-            position: relative;
+            position: fixed;
+            width: 100%;
+            height: 100vh;
             opacity: 0;
             transition: opacity 0.5s ease-in-out;
+
         }
 
         body.loaded {
@@ -27,13 +34,9 @@
         }
 
         #backgroundVideo {
-            position: fixed;
-            top: 0;
-            left: 0;
             width: 100%;
             height: 100%;
             object-fit: cover;
-            z-index: 0;
         }
 
         #canvas {
@@ -196,8 +199,8 @@
             align-items: center;
             max-width: 100%;
             height: 100%;
-
             overflow-wrap: break-word;
+            padding: 0 20px;
         }
 
         #closeHint {
@@ -210,7 +213,6 @@
             text-align: center;
             opacity: 0;
             transition: opacity 0.5s;
-            /*text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);*/
             z-index: 2;
         }
 
@@ -229,7 +231,6 @@
             }
         }
 
-        /* Стилі для коробки подарунка */
         #giftBox {
             position: absolute;
             width: 250px;
@@ -321,6 +322,64 @@
             object-fit: contain;
             filter: drop-shadow(0 5px 15px rgba(255, 215, 0, 0.5));
         }
+
+        /* ============================================ */
+        /* АДАПТАЦІЯ ДЛЯ МОБІЛЬНИХ ПРИСТРОЇВ */
+        /* ============================================ */
+        @media screen and (max-width: 768px) {
+            /* ІКОНКА - ЗМЕНШЕНА */
+            .candy-container img {
+                width: 100px;
+            }
+
+            #wishCard {
+                max-width: 100%;
+                padding: 20px;
+
+
+
+            }
+
+
+
+            #modalImageContainer {
+                padding: 0;
+            }
+
+            #modalBackgroundImage.mobile {
+                content: url('src/assets/modalPhone.png');
+                height: 100vh;
+                width: auto;
+            }
+
+            #wishContent {
+                width: 90%;
+                padding: 20px;
+                height: auto;
+            }
+
+            #wishCard h2 {
+                font-size: 22px;
+                color: #ffd700;
+            }
+
+            #wishText {
+                font-size: 16px;
+                line-height: 1.4;
+                padding: 10px;
+                max-height: 50vh;
+                overflow-y: auto;
+                height: auto;
+            }
+
+            #closeHint {
+                bottom: 150px;
+                font-size: 12px;
+                padding: 0 20px;
+                width: 80%;
+            }
+
+        }
     </style>
 </head>
 <body>
@@ -338,13 +397,10 @@
          draggable="false">
 </div>
 
-<!-- Canvas для конфетті в модальному вікні -->
 <canvas id="modalConfettiCanvas"></canvas>
 
-<!-- Модальне вікно -->
 <div id="modalOverlay">
     <div id="wishCard">
-        <!-- Контейнер для фонового зображення -->
         <div id="modalImageContainer">
             <img id="modalBackgroundImage" src="src/assets/modal.png" alt="Новорічна листівка">
         </div>
@@ -357,7 +413,6 @@
         <div id="closeHint">Натисніть на екран, щоб закрити</div>
     </div>
 
-    <!-- Коробка подарунка -->
     <div id="giftBox">
         <img src="src/assets/gift.png" alt="Подарунок">
     </div>
@@ -378,42 +433,39 @@
     const candyImg = document.getElementById('candyImg');
     const anchor = document.getElementById('anchor');
 
-    // Модальне вікно
     const modalOverlay = document.getElementById('modalOverlay');
     const wishText = document.getElementById('wishText');
     const closeHint = document.getElementById('closeHint');
     const giftBox = document.getElementById('giftBox');
+    const modalBackgroundImage = document.getElementById('modalBackgroundImage');
 
-    // Canvas для конфетті в модальному вікні
     const modalConfettiCanvas = document.getElementById('modalConfettiCanvas');
     const modalConfettiCtx = modalConfettiCanvas.getContext('2d');
 
-    // Аудіо для конфетті
     const confettiSound = new Audio('src/assets/audio.mp3');
     confettiSound.volume = 0.5;
 
-    // Кольори для гірлянди
+    // Визначення мобільного пристрою
+    const isMobile = window.innerWidth <= 768;
+
+    // Встановлення правильного зображення для модального вікна
+    if (isMobile) {
+        modalBackgroundImage.classList.add('mobile');
+        modalBackgroundImage.src = 'src/assets/modalPhone.png';
+    }
+
     const garlandColors = [
-        '#FF0000', // Червоний
-        '#00FF00', // Зелений
-        '#0080FF', // Синій
-        '#FFD700', // Золотий
-        '#FF00FF', // Пурпурний
-        '#00FFFF', // Блакитний
-        '#FFFF00', // Жовтий
-        '#FF6600'  // Помаранчевий
+        '#FF0000', '#00FF00', '#0080FF', '#FFD700',
+        '#FF00FF', '#00FFFF', '#FFFF00', '#FF6600'
     ];
 
-    // Ініціалізація кольорів для кожної точки
     const lightColors = [];
-    for (let i = 0; i <= 20; i++) {
+    for (let i = 0; i <= 30; i++) {
         lightColors.push(garlandColors[i % garlandColors.length]);
     }
 
-    // Для ефекту мигання
     let blinkTime = 0;
 
-    // Завантаження побажань
     let wishes = [];
     fetch('src/assets/wishes.json')
         .then(response => response.json())
@@ -422,7 +474,6 @@
         })
         .catch(error => console.error('Помилка завантаження побажань:', error));
 
-    // Налаштування canvas
     function resizeCanvas() {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
@@ -433,26 +484,22 @@
     }
     resizeCanvas();
 
-    // Фізичні параметри
     const anchorX = canvas.width / 2;
     const anchorY = 0;
-    const stringLength = 300;
+    const stringLength = isMobile ? 200 : 300;
 
-    // Параметри маятника
     let angle = (Math.random() - 0.5) * 0.3;
     let angleVelocity = (Math.random() - 0.5) * 0.05;
     const angleAcceleration = 0.0008;
     const angleDamping = 0.996;
 
-    const confettiPullThreshold = 100;
+    const confettiPullThreshold = isMobile ? 80 : 100;
     const confettiCooldown = 3000;
     let lastConfettiTime = 0;
 
-    // Параметри нитки
     const stringSegments = 20;
     const stringPoints = [];
 
-    // Ініціалізація точок нитки
     for (let i = 0; i <= stringSegments; i++) {
         stringPoints.push({
             x: anchorX,
@@ -480,18 +527,15 @@
     let lastPosX = posX;
     let lastPosY = posY;
 
-    // Масив конфетті
     let confetti = [];
     let modalConfetti = [];
     let confettiTriggered = false;
     let wasStretched = false;
     let confettiAnimationFinished = false;
 
-    // Встановлення початкової позиції
     anchor.style.left = anchorX + 'px';
     anchor.style.top = anchorY + 'px';
 
-    // Обчислення позиції з кута
     function updatePositionFromAngle() {
         const targetX = anchorX + Math.sin(angle) * stringLength;
         const targetY = anchorY + Math.cos(angle) * stringLength;
@@ -500,110 +544,120 @@
         posY += (targetY - posY) * 0.3;
     }
 
-    // Початкова позиція
     updatePositionFromAngle();
 
-    // Обробка миші (ЛКМ)
-    candyContainer.addEventListener('mousedown', (e) => {
-        if (e.button === 0) {
-            isDragging = true;
-            const rect = candyContainer.getBoundingClientRect();
-            dragOffsetX = e.clientX - rect.left - rect.width / 2;
-            dragOffsetY = e.clientY - rect.top - rect.height / 2;
-            lastMouseX = e.clientX;
-            lastMouseY = e.clientY;
-            mouseVelocityX = 0;
-            mouseVelocityY = 0;
-            velocityX = 0;
-            velocityY = 0;
-            confettiTriggered = false;
-            wasStretched = false;
+    // Обробка touch events для мобільних
+    function handleStart(e) {
+        e.preventDefault();
+        isDragging = true;
+
+        const touch = e.touches ? e.touches[0] : e;
+        const rect = candyContainer.getBoundingClientRect();
+
+        dragOffsetX = touch.clientX - rect.left - rect.width / 2;
+        dragOffsetY = touch.clientY - rect.top - rect.height / 2;
+        lastMouseX = touch.clientX;
+        lastMouseY = touch.clientY;
+        mouseVelocityX = 0;
+        mouseVelocityY = 0;
+        velocityX = 0;
+        velocityY = 0;
+        confettiTriggered = false;
+        wasStretched = false;
+    }
+
+    function handleMove(e) {
+        if (!isDragging) return;
+        e.preventDefault();
+
+        const touch = e.touches ? e.touches[0] : e;
+        const currentVelX = touch.clientX - lastMouseX;
+        const currentVelY = touch.clientY - lastMouseY;
+
+        mouseVelocityX = mouseVelocityX * 0.7 + currentVelX * 0.3;
+        mouseVelocityY = mouseVelocityY * 0.7 + currentVelY * 0.3;
+
+        lastMouseX = touch.clientX;
+        lastMouseY = touch.clientY;
+
+        const targetX = touch.clientX - dragOffsetX;
+        const targetY = touch.clientY - dragOffsetY;
+
+        const dx = targetX - anchorX;
+        const dy = targetY - anchorY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        const maxStretch = stringLength * 1.5;
+        if (distance > maxStretch) {
+            posX = anchorX + (dx / distance) * maxStretch;
+            posY = anchorY + (dy / distance) * maxStretch;
+            wasStretched = true;
+        } else {
+            posX += (targetX - posX) * 0.3;
+            posY += (targetY - posY) * 0.3;
         }
-    });
 
-    document.addEventListener('mousemove', (e) => {
-        if (isDragging) {
-            const currentVelX = e.clientX - lastMouseX;
-            const currentVelY = e.clientY - lastMouseY;
+        const currentTime = Date.now();
+        const pullDistance = posY - (anchorY + stringLength);
+        if (pullDistance > confettiPullThreshold && !confettiTriggered &&
+            (currentTime - lastConfettiTime) >= confettiCooldown) {
+            createConfettiBurst();
+            confettiTriggered = true;
+            lastConfettiTime = currentTime;
+            confettiAnimationFinished = false;
+            velocityY = -8;
+            velocityX = (Math.random() - 0.5) * 4;
 
-            mouseVelocityX = mouseVelocityX * 0.7 + currentVelX * 0.3;
-            mouseVelocityY = mouseVelocityY * 0.7 + currentVelY * 0.3;
+            confettiSound.currentTime = 0;
+            confettiSound.play().catch(e => console.log('Audio play failed:', e));
 
-            lastMouseX = e.clientX;
-            lastMouseY = e.clientY;
-
-            const targetX = e.clientX - dragOffsetX;
-            const targetY = e.clientY - dragOffsetY;
-
-            const dx = targetX - anchorX;
-            const dy = targetY - anchorY;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-
-            const maxStretch = stringLength * 1.5;
-            if (distance > maxStretch) {
-                posX = anchorX + (dx / distance) * maxStretch;
-                posY = anchorY + (dy / distance) * maxStretch;
-                wasStretched = true;
-            } else {
-                posX += (targetX - posX) * 0.3;
-                posY += (targetY - posY) * 0.3;
-            }
-
-            // Перевірка на конфетті з затримкою
-            const currentTime = Date.now();
-            const pullDistance = posY - (anchorY + stringLength);
-            if (pullDistance > confettiPullThreshold && !confettiTriggered &&
-                (currentTime - lastConfettiTime) >= confettiCooldown) {
-                createConfettiBurst();
-                confettiTriggered = true;
-                lastConfettiTime = currentTime;
-                confettiAnimationFinished = false;
-                velocityY = -8;
-                velocityX = (Math.random() - 0.5) * 4;
-
-                // Програємо звук
-                confettiSound.currentTime = 0;
-                confettiSound.play().catch(e => console.log('Audio play failed:', e));
-
-                // Показуємо модальне вікно через 1 секунду після початку конфетті
-                setTimeout(() => {
-                    showWishModal();
-                }, 1000);
-            }
-
-            updatePosition();
+            setTimeout(() => {
+                showWishModal();
+            }, 1000);
         }
-    });
 
-    document.addEventListener('mouseup', (e) => {
-        if (e.button === 0 && isDragging) {
-            isDragging = false;
+        updatePosition();
+    }
 
-            const dx = posX - anchorX;
-            const dy = posY - anchorY;
+    function handleEnd(e) {
+        if (!isDragging) return;
+        e.preventDefault();
 
-            const currentDistance = Math.sqrt(dx * dx + dy * dy);
-            if (currentDistance > stringLength * 1.2 || wasStretched) {
-                const normalizedX = anchorX + (dx / currentDistance) * stringLength;
-                const normalizedY = anchorY + (dy / currentDistance) * stringLength;
+        isDragging = false;
 
-                velocityX = (normalizedX - posX) * 0.3 + mouseVelocityX * 0.8;
-                velocityY = (normalizedY - posY) * 0.3 + mouseVelocityY * 0.8;
-            } else {
-                velocityX = mouseVelocityX * 0.8;
-                velocityY = mouseVelocityY * 0.8;
-            }
+        const dx = posX - anchorX;
+        const dy = posY - anchorY;
 
-            angle = Math.atan2(dx, dy);
+        const currentDistance = Math.sqrt(dx * dx + dy * dy);
+        if (currentDistance > stringLength * 1.2 || wasStretched) {
+            const normalizedX = anchorX + (dx / currentDistance) * stringLength;
+            const normalizedY = anchorY + (dy / currentDistance) * stringLength;
 
-            const tangentialVelocity = velocityX * Math.cos(angle) - velocityY * Math.sin(angle);
-            angleVelocity = tangentialVelocity / stringLength;
-
-            angleVelocity += (Math.random() - 0.5) * 0.008;
+            velocityX = (normalizedX - posX) * 0.3 + mouseVelocityX * 0.8;
+            velocityY = (normalizedY - posY) * 0.3 + mouseVelocityY * 0.8;
+        } else {
+            velocityX = mouseVelocityX * 0.8;
+            velocityY = mouseVelocityY * 0.8;
         }
-    });
 
-    // Функція створення вибуху конфетті
+        angle = Math.atan2(dx, dy);
+
+        const tangentialVelocity = velocityX * Math.cos(angle) - velocityY * Math.sin(angle);
+        angleVelocity = tangentialVelocity / stringLength;
+
+        angleVelocity += (Math.random() - 0.5) * 0.008;
+    }
+
+    // Додаємо обробники для миші та touch
+    candyContainer.addEventListener('mousedown', handleStart);
+    candyContainer.addEventListener('touchstart', handleStart, { passive: false });
+
+    document.addEventListener('mousemove', handleMove);
+    document.addEventListener('touchmove', handleMove, { passive: false });
+
+    document.addEventListener('mouseup', handleEnd);
+    document.addEventListener('touchend', handleEnd, { passive: false });
+
     function createConfettiBurst(fromX, fromY, isModal = false) {
         const colors = [
             '#FF0040', '#FF1493', '#FF69B4', '#FF4500',
@@ -615,10 +669,11 @@
         const shapes = ['circle', 'square', 'triangle', 'star', 'heart', 'diamond'];
 
         const targetArray = isModal ? modalConfetti : confetti;
+        const particleCount = isMobile ? 300 : 600;
 
         if (fromX !== undefined) {
-            for (let i = 0; i < 600; i++) {
-                const angle = (Math.PI * 2 * i) / 600 + Math.random() * 0.5;
+            for (let i = 0; i < particleCount; i++) {
+                const angle = (Math.PI * 2 * i) / particleCount + Math.random() * 0.5;
                 const speed = Math.random() * 12 + 6;
                 targetArray.push({
                     x: fromX,
@@ -638,8 +693,9 @@
                 });
             }
         } else {
-            // Ліва сторона
-            for (let i = 0; i < 300; i++) {
+            const sideParticles = isMobile ? 150 : 300;
+
+            for (let i = 0; i < sideParticles; i++) {
                 const angle = Math.random() * Math.PI / 2.5 - Math.PI / 8;
                 const speed = Math.random() * 6 + 4;
                 targetArray.push({
@@ -660,8 +716,7 @@
                 });
             }
 
-            // Права сторона
-            for (let i = 0; i < 300; i++) {
+            for (let i = 0; i < sideParticles; i++) {
                 const angle = Math.PI - (Math.random() * Math.PI / 2.5 - Math.PI / 8);
                 const speed = Math.random() * 6 + 4;
                 targetArray.push({
@@ -684,7 +739,6 @@
         }
     }
 
-    // Показ модального вікна з побажанням
     function showWishModal() {
         if (wishes.length === 0) return;
 
@@ -695,8 +749,8 @@
         giftBox.classList.remove('show');
         giftBox.classList.remove('exploding');
 
-        // Ефект друкарської машинки
         let charIndex = 0;
+        const typewriterSpeed = isMobile ? 40 : 50;
         const typewriterInterval = setInterval(() => {
             if (charIndex < randomWish.length) {
                 wishText.textContent += randomWish[charIndex];
@@ -707,10 +761,9 @@
                     showGiftBox();
                 }, 500);
             }
-        }, 50);
+        }, typewriterSpeed);
     }
 
-    // Показ коробки подарунка
     function showGiftBox() {
         giftBox.classList.add('show');
 
@@ -719,7 +772,6 @@
         }, 3000);
     }
 
-    // Обробка кліку на коробку подарунка
     giftBox.addEventListener('click', (e) => {
         e.stopPropagation();
 
@@ -743,20 +795,22 @@
         }, 400);
     });
 
-    // Закриття модального вікна
     modalOverlay.addEventListener('click', (e) => {
-        if (e.target === modalOverlay || e.target === wishCard) {
-            modalOverlay.classList.remove('show');
-            closeHint.classList.remove('show');
-            giftBox.classList.remove('show');
-            giftBox.classList.remove('exploding');
-            giftBox.style.animation = '';
-            modalConfettiCanvas.classList.remove('show');
-            modalConfetti = [];
+        // Якщо натиснули на подарунок - не закриваємо
+        if (e.target.closest('#giftBox')) {
+            return;
         }
+
+        // Інакше закриваємо модальне вікно
+        modalOverlay.classList.remove('show');
+        closeHint.classList.remove('show');
+        giftBox.classList.remove('show');
+        giftBox.classList.remove('exploding');
+        giftBox.style.animation = '';
+        modalConfettiCanvas.classList.remove('show');
+        modalConfetti = [];
     });
 
-    // Оновлення гнучкої нитки
     function updateString() {
         stringPoints[0].x = anchorX;
         stringPoints[0].y = anchorY;
@@ -805,11 +859,9 @@
         }
     }
 
-    // Малювання гірлянди замість простої нитки
     function drawString() {
         stringCtx.clearRect(0, 0, stringCanvas.width, stringCanvas.height);
 
-        // Малюємо дріт гірлянди (темна лінія)
         stringCtx.beginPath();
         stringCtx.moveTo(stringPoints[0].x, stringPoints[0].y);
 
@@ -827,20 +879,16 @@
         stringCtx.lineCap = 'round';
         stringCtx.stroke();
 
-        // Малюємо лампочки на гірлянді
         blinkTime += 0.05;
 
         for (let i = 0; i <= stringSegments; i++) {
             const point = stringPoints[i];
 
-            // Ефект мигання (різні лампочки мигають в різний час)
             const blinkOffset = i * 0.5;
             const brightness = 0.7 + Math.sin(blinkTime + blinkOffset) * 0.3;
 
-            // Розмір лампочки
-            const bulbSize = 8;
+            const bulbSize = isMobile ? 6 : 8;
 
-            // Малюємо світло навколо лампочки
             const gradient = stringCtx.createRadialGradient(
                 point.x, point.y, 0,
                 point.x, point.y, bulbSize * 2.5
@@ -857,7 +905,6 @@
             stringCtx.arc(point.x, point.y, bulbSize * 2.5, 0, Math.PI * 2);
             stringCtx.fill();
 
-            // Малюємо саму лампочку
             stringCtx.globalAlpha = 1;
             stringCtx.fillStyle = color;
             stringCtx.shadowBlur = 15 * brightness;
@@ -866,7 +913,6 @@
             stringCtx.arc(point.x, point.y, bulbSize, 0, Math.PI * 2);
             stringCtx.fill();
 
-            // Малюємо блиск на лампочці
             stringCtx.shadowBlur = 0;
             stringCtx.fillStyle = 'rgba(255, 255, 255, ' + (brightness * 0.8) + ')';
             stringCtx.beginPath();
@@ -878,7 +924,6 @@
         stringCtx.shadowBlur = 0;
     }
 
-    // Оновлення динаміки цукерки
     function updateCandyPhysics() {
         const moveSpeedX = posX - lastPosX;
         const moveSpeedY = posY - lastPosY;
@@ -892,7 +937,6 @@
         candyTilt = Math.max(-45, Math.min(45, candyTilt));
     }
 
-    // Оновлення позиції цукерки
     function updatePosition() {
         updateCandyPhysics();
 
@@ -902,7 +946,6 @@
         candyContainer.style.transform = `rotate(${candyTilt - 200}deg)`;
     }
 
-    // Малювання конфетті
     function drawConfetti(particle, context) {
         context.save();
         context.translate(particle.x, particle.y);
@@ -986,7 +1029,6 @@
         context.fill();
     }
 
-    // Головний цикл анімації
     function animate() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         modalConfettiCtx.clearRect(0, 0, modalConfettiCanvas.width, modalConfettiCanvas.height);
@@ -1035,7 +1077,6 @@
         updateString();
         drawString();
 
-        // Оновлення основного конфетті
         confetti = confetti.filter(particle => {
             particle.vy += particle.gravity;
             particle.vx += particle.wobble * 0.05;
@@ -1056,7 +1097,6 @@
                 particle.x < canvas.width + 100;
         });
 
-        // Оновлення модального конфетті
         modalConfetti = modalConfetti.filter(particle => {
             particle.vy += particle.gravity;
             particle.vx += particle.wobble * 0.05;
@@ -1080,12 +1120,17 @@
         requestAnimationFrame(animate);
     }
 
-    // Зміна розміру вікна
     window.addEventListener('resize', () => {
+        const wasMobile = isMobile;
+        const isNowMobile = window.innerWidth <= 768;
+
+        if (wasMobile !== isNowMobile) {
+            location.reload();
+        }
+
         resizeCanvas();
     });
 
-    // Запуск анімації
     animate();
 </script>
 </body>
