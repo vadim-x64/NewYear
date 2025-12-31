@@ -63,7 +63,7 @@ resizeCanvas();
 
 const anchorX = canvas.width / 2;
 const anchorY = 0;
-const stringLength = isMobile ? 200 : 300;
+const stringLength = 300;
 let angle = (Math.random() - 0.5) * 0.3;
 let angleVelocity = (Math.random() - 0.5) * 0.05;
 const angleAcceleration = 0.0008;

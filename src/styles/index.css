@@ -3,7 +3,7 @@
     padding: 0;
     box-sizing: border-box;
     user-select: none;
-    font-family: 'Comic Sans MS', sans-serif;
+    font-family: 'Comfortaa', 'Arial', sans-serif;
 }
 
 html {
@@ -368,9 +368,14 @@ body.loaded {
     }
 
     #closeHint {
-        bottom: 150px;
+        bottom: 170px;
         font-size: 12px;
         padding: 0 20px;
         width: 80%;
+    }
+
+    #giftBox {
+        width: 250px;
+        height: 250px;
     }
 }
