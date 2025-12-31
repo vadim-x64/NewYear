@@ -342,7 +342,7 @@ body.loaded {
     }
 
     #modalBackgroundImage.mobile {
-        content: url('../assets/modalPhone.png');
+        content: url('/src/assets/modalPhone.png');
         height: 100vh;
         width: auto;
     }
