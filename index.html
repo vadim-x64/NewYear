@@ -14,10 +14,15 @@
 
         body {
             overflow: hidden;
-            background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
-            font-family: Arial, sans-serif;
+            background: #FFFFFF;
             cursor: default;
             position: relative;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+        }
+
+        body.loaded {
+            opacity: 1;
         }
 
         #backgroundVideo {
@@ -64,7 +69,7 @@
         }
 
         .candy-container img {
-            width: 100px;
+            width: 120px;
         }
 
         .candy-container:active {
@@ -103,6 +108,21 @@
             to {
                 opacity: 1;
             }
+        }
+
+        #modalConfettiCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 102;
+            display: none;
+        }
+
+        #modalConfettiCanvas.show {
+            display: block;
         }
 
         #wishCard {
@@ -215,6 +235,99 @@
                 transform: scale(1.2);
             }
         }
+
+        /* Стилі для коробки подарунка */
+        #giftBox {
+            position: absolute;
+            width: 250px;
+            height: 250px;
+            cursor: pointer;
+            z-index: 101;
+            display: none;
+            opacity: 0;
+            transition: transform 0.2s;
+        }
+
+        #giftBox.show {
+            display: block;
+            animation: giftAppear 0.8s ease-out forwards, giftBounce 1.5s ease-in-out infinite 0.8s;
+        }
+
+        #giftBox:hover {
+            transform: scale(1.1);
+        }
+
+        #giftBox.exploding {
+            animation: giftExplode 0.1s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards !important;
+        }
+
+        @keyframes giftAppear {
+            0% {
+                opacity: 0;
+                transform: translateY(-100px) scale(0.3) rotate(0deg);
+            }
+            60% {
+                opacity: 1;
+                transform: translateY(20px) scale(1.1) rotate(5deg);
+            }
+            80% {
+                transform: translateY(-10px) scale(0.95) rotate(-3deg);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0) scale(1) rotate(0deg);
+            }
+        }
+
+        @keyframes giftBounce {
+            0%, 100% {
+                transform: translateY(0) rotate(0deg) scale(1);
+            }
+            10% {
+                transform: translateY(-15px) rotate(-5deg) scale(1);
+            }
+            20% {
+                transform: translateY(0) rotate(5deg) scale(1);
+            }
+            30% {
+                transform: translateY(-10px) rotate(-3deg) scale(1);
+            }
+            40% {
+                transform: translateY(0) rotate(3deg) scale(1);
+            }
+            50% {
+                transform: translateY(-5px) rotate(0deg) scale(1);
+            }
+            60% {
+                transform: translateY(0) rotate(0deg) scale(1);
+            }
+        }
+
+        @keyframes giftExplode {
+            0% {
+                transform: scale(1) rotate(0deg);
+                opacity: 1;
+            }
+            20% {
+                transform: scale(1.3) rotate(180deg);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.5) rotate(540deg);
+                opacity: 0.6;
+            }
+            100% {
+                transform: scale(0) rotate(1080deg);
+                opacity: 0;
+            }
+        }
+
+        #giftBox img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            filter: drop-shadow(0 5px 15px rgba(255, 215, 0, 0.5));
+        }
     </style>
 </head>
 <body>
@@ -232,6 +345,9 @@
          draggable="false">
 </div>
 
+<!-- Canvas для конфетті в модальному вікні -->
+<canvas id="modalConfettiCanvas"></canvas>
+
 <!-- Модальне вікно -->
 <div id="modalOverlay">
     <div id="wishCard">
@@ -247,9 +363,20 @@
 
         <div id="closeHint">Натисніть на екран, щоб закрити</div>
     </div>
+
+    <!-- Коробка подарунка -->
+    <div id="giftBox">
+        <img src="src/assets/gift.png" alt="Подарунок">
+    </div>
 </div>
 
 <script>
+    window.addEventListener('load', () => {
+        setTimeout(() => {
+            document.body.classList.add('loaded');
+        }, 500);
+    });
+
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
     const stringCanvas = document.getElementById('stringCanvas');
@@ -262,10 +389,36 @@
     const modalOverlay = document.getElementById('modalOverlay');
     const wishText = document.getElementById('wishText');
     const closeHint = document.getElementById('closeHint');
+    const giftBox = document.getElementById('giftBox');
+
+    // Canvas для конфетті в модальному вікні
+    const modalConfettiCanvas = document.getElementById('modalConfettiCanvas');
+    const modalConfettiCtx = modalConfettiCanvas.getContext('2d');
 
     // Аудіо для конфетті
     const confettiSound = new Audio('src/assets/audio.mp3');
     confettiSound.volume = 0.5;
+
+    // Кольори для гірлянди
+    const garlandColors = [
+        '#FF0000', // Червоний
+        '#00FF00', // Зелений
+        '#0080FF', // Синій
+        '#FFD700', // Золотий
+        '#FF00FF', // Пурпурний
+        '#00FFFF', // Блакитний
+        '#FFFF00', // Жовтий
+        '#FF6600'  // Помаранчевий
+    ];
+
+    // Ініціалізація кольорів для кожної точки
+    const lightColors = [];
+    for (let i = 0; i <= 20; i++) {
+        lightColors.push(garlandColors[i % garlandColors.length]);
+    }
+
+    // Для ефекту мигання
+    let blinkTime = 0;
 
     // Завантаження побажань
     let wishes = [];
@@ -282,13 +435,15 @@
         canvas.height = window.innerHeight;
         stringCanvas.width = window.innerWidth;
         stringCanvas.height = window.innerHeight;
+        modalConfettiCanvas.width = window.innerWidth;
+        modalConfettiCanvas.height = window.innerHeight;
     }
     resizeCanvas();
 
     // Фізичні параметри
     const anchorX = canvas.width / 2;
-    const anchorY = 30;
-    const stringLength = 250;
+    const anchorY = 0;
+    const stringLength = 300;
 
     // Параметри маятника
     let angle = (Math.random() - 0.5) * 0.3;
@@ -334,6 +489,7 @@
 
     // Масив конфетті
     let confetti = [];
+    let modalConfetti = [];
     let confettiTriggered = false;
     let wasStretched = false;
     let confettiAnimationFinished = false;
@@ -416,10 +572,10 @@
                 confettiSound.currentTime = 0;
                 confettiSound.play().catch(e => console.log('Audio play failed:', e));
 
-                // Показуємо модальне вікно через 0.5 секунди після початку конфетті
+                // Показуємо модальне вікно через 1 секунду після початку конфетті
                 setTimeout(() => {
                     showWishModal();
-                }, 500);
+                }, 1000);
             }
 
             updatePosition();
@@ -455,56 +611,83 @@
     });
 
     // Функція створення вибуху конфетті
-    function createConfettiBurst() {
+    function createConfettiBurst(fromX, fromY, isModal = false) {
         const colors = [
-            '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A',
-            '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E2',
-            '#F8B739', '#52B788', '#FF6B9D', '#C9A0DC'
+            '#FF0040', '#FF1493', '#FF69B4', '#FF4500',
+            '#FFD700', '#FFFF00', '#00FF00', '#00FFFF',
+            '#0080FF', '#4169E1', '#8B00FF', '#FF00FF',
+            '#FF6347', '#32CD32', '#00CED1', '#FF1493',
+            '#FFD700', '#FF8C00', '#00FF7F', '#7B68EE'
         ];
         const shapes = ['circle', 'square', 'triangle', 'star', 'heart', 'diamond'];
 
-        // Ліва сторона
-        for (let i = 0; i < 150; i++) {
-            const angle = Math.random() * Math.PI / 2.5 - Math.PI / 8;
-            const speed = Math.random() * 6 + 4;
-            confetti.push({
-                x: 0,
-                y: Math.random() * canvas.height * 0.6 + canvas.height * 0.2,
-                vx: Math.cos(angle) * speed,
-                vy: Math.sin(angle) * speed - Math.random() * 3,
-                gravity: 0.15,
-                size: Math.random() * 12 + 6,
-                color: colors[Math.floor(Math.random() * colors.length)],
-                shape: shapes[Math.floor(Math.random() * shapes.length)],
-                rotation: Math.random() * 360,
-                rotationSpeed: Math.random() * 10 - 5,
-                opacity: 1,
-                life: 240 + Math.random() * 120,
-                maxLife: 240 + Math.random() * 120,
-                wobble: Math.random() * 1.5 - 0.75
-            });
-        }
+        const targetArray = isModal ? modalConfetti : confetti;
 
-        // Права сторона
-        for (let i = 0; i < 150; i++) {
-            const angle = Math.PI - (Math.random() * Math.PI / 2.5 - Math.PI / 8);
-            const speed = Math.random() * 6 + 4;
-            confetti.push({
-                x: canvas.width,
-                y: Math.random() * canvas.height * 0.6 + canvas.height * 0.2,
-                vx: Math.cos(angle) * speed,
-                vy: Math.sin(angle) * speed - Math.random() * 3,
-                gravity: 0.15,
-                size: Math.random() * 12 + 6,
-                color: colors[Math.floor(Math.random() * colors.length)],
-                shape: shapes[Math.floor(Math.random() * shapes.length)],
-                rotation: Math.random() * 360,
-                rotationSpeed: Math.random() * 10 - 5,
-                opacity: 1,
-                life: 240 + Math.random() * 120,
-                maxLife: 240 + Math.random() * 120,
-                wobble: Math.random() * 1.5 - 0.75
-            });
+        if (fromX !== undefined) {
+            for (let i = 0; i < 600; i++) {
+                const angle = (Math.PI * 2 * i) / 600 + Math.random() * 0.5;
+                const speed = Math.random() * 12 + 6;
+                targetArray.push({
+                    x: fromX,
+                    y: fromY,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed - Math.random() * 4,
+                    gravity: 0.15,
+                    size: Math.random() * 10 + 4,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    shape: shapes[Math.floor(Math.random() * shapes.length)],
+                    rotation: Math.random() * 360,
+                    rotationSpeed: Math.random() * 20 - 10,
+                    opacity: 1,
+                    life: 550 + Math.random() * 300,
+                    maxLife: 550 + Math.random() * 300,
+                    wobble: Math.random() * 2.5 - 1.25
+                });
+            }
+        } else {
+            // Ліва сторона
+            for (let i = 0; i < 300; i++) {
+                const angle = Math.random() * Math.PI / 2.5 - Math.PI / 8;
+                const speed = Math.random() * 6 + 4;
+                targetArray.push({
+                    x: 0,
+                    y: Math.random() * canvas.height * 0.6 + canvas.height * 0.2,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed - Math.random() * 3,
+                    gravity: 0.12,
+                    size: Math.random() * 6 + 3,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    shape: shapes[Math.floor(Math.random() * shapes.length)],
+                    rotation: Math.random() * 360,
+                    rotationSpeed: Math.random() * 10 - 5,
+                    opacity: 1,
+                    life: 400 + Math.random() * 200,
+                    maxLife: 400 + Math.random() * 200,
+                    wobble: Math.random() * 1.5 - 0.75
+                });
+            }
+
+            // Права сторона
+            for (let i = 0; i < 300; i++) {
+                const angle = Math.PI - (Math.random() * Math.PI / 2.5 - Math.PI / 8);
+                const speed = Math.random() * 6 + 4;
+                targetArray.push({
+                    x: canvas.width,
+                    y: Math.random() * canvas.height * 0.6 + canvas.height * 0.2,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed - Math.random() * 3,
+                    gravity: 0.12,
+                    size: Math.random() * 6 + 3,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    shape: shapes[Math.floor(Math.random() * shapes.length)],
+                    rotation: Math.random() * 360,
+                    rotationSpeed: Math.random() * 10 - 5,
+                    opacity: 1,
+                    life: 400 + Math.random() * 200,
+                    maxLife: 400 + Math.random() * 200,
+                    wobble: Math.random() * 1.5 - 0.75
+                });
+            }
         }
     }
 
@@ -516,6 +699,8 @@
         modalOverlay.classList.add('show');
         wishText.textContent = '';
         closeHint.classList.remove('show');
+        giftBox.classList.remove('show');
+        giftBox.classList.remove('exploding');
 
         // Ефект друкарської машинки
         let charIndex = 0;
@@ -525,18 +710,57 @@
                 charIndex++;
             } else {
                 clearInterval(typewriterInterval);
-                // Показуємо підказку через 5 секунд
                 setTimeout(() => {
-                    closeHint.classList.add('show');
-                }, 5000);
+                    showGiftBox();
+                }, 500);
             }
         }, 50);
     }
 
+    // Показ коробки подарунка
+    function showGiftBox() {
+        giftBox.classList.add('show');
+
+        setTimeout(() => {
+            closeHint.classList.add('show');
+        }, 3000);
+    }
+
+    // Обробка кліку на коробку подарунка
+    giftBox.addEventListener('click', (e) => {
+        e.stopPropagation();
+
+        const rect = giftBox.getBoundingClientRect();
+        const giftCenterX = rect.left + rect.width / 2;
+        const giftCenterY = rect.top + rect.height / 2;
+
+        giftBox.classList.add('exploding');
+
+        confettiSound.currentTime = 0;
+        confettiSound.play().catch(e => console.log('Audio play failed:', e));
+
+        modalConfettiCanvas.classList.add('show');
+
+        createConfettiBurst(giftCenterX, giftCenterY, true);
+
+        setTimeout(() => {
+            giftBox.classList.remove('show');
+            giftBox.classList.remove('exploding');
+            giftBox.style.animation = '';
+        }, 400);
+    });
+
     // Закриття модального вікна
-    modalOverlay.addEventListener('click', () => {
-        modalOverlay.classList.remove('show');
-        closeHint.classList.remove('show');
+    modalOverlay.addEventListener('click', (e) => {
+        if (e.target === modalOverlay || e.target === wishCard) {
+            modalOverlay.classList.remove('show');
+            closeHint.classList.remove('show');
+            giftBox.classList.remove('show');
+            giftBox.classList.remove('exploding');
+            giftBox.style.animation = '';
+            modalConfettiCanvas.classList.remove('show');
+            modalConfetti = [];
+        }
     });
 
     // Оновлення гнучкої нитки
@@ -588,10 +812,11 @@
         }
     }
 
-    // Малювання гнучкої нитки
+    // Малювання гірлянди замість простої нитки
     function drawString() {
         stringCtx.clearRect(0, 0, stringCanvas.width, stringCanvas.height);
 
+        // Малюємо дріт гірлянди (темна лінія)
         stringCtx.beginPath();
         stringCtx.moveTo(stringPoints[0].x, stringPoints[0].y);
 
@@ -604,12 +829,60 @@
             stringCtx.quadraticCurveTo(p1.x, p1.y, midX, midY);
         }
 
-        stringCtx.strokeStyle = 'rgba(255, 215, 0, 0.8)';
-        stringCtx.lineWidth = 3;
+        stringCtx.strokeStyle = '#2d5016';
+        stringCtx.lineWidth = 2;
         stringCtx.lineCap = 'round';
-        stringCtx.shadowBlur = 10;
-        stringCtx.shadowColor = 'rgba(255, 215, 0, 0.5)';
         stringCtx.stroke();
+
+        // Малюємо лампочки на гірлянді
+        blinkTime += 0.05;
+
+        for (let i = 0; i <= stringSegments; i++) {
+            const point = stringPoints[i];
+
+            // Ефект мигання (різні лампочки мигають в різний час)
+            const blinkOffset = i * 0.5;
+            const brightness = 0.7 + Math.sin(blinkTime + blinkOffset) * 0.3;
+
+            // Розмір лампочки
+            const bulbSize = 8;
+
+            // Малюємо світло навколо лампочки
+            const gradient = stringCtx.createRadialGradient(
+                point.x, point.y, 0,
+                point.x, point.y, bulbSize * 2.5
+            );
+
+            const color = lightColors[i];
+            gradient.addColorStop(0, color);
+            gradient.addColorStop(0.3, color + '88');
+            gradient.addColorStop(1, color + '00');
+
+            stringCtx.globalAlpha = brightness * 0.6;
+            stringCtx.fillStyle = gradient;
+            stringCtx.beginPath();
+            stringCtx.arc(point.x, point.y, bulbSize * 2.5, 0, Math.PI * 2);
+            stringCtx.fill();
+
+            // Малюємо саму лампочку
+            stringCtx.globalAlpha = 1;
+            stringCtx.fillStyle = color;
+            stringCtx.shadowBlur = 15 * brightness;
+            stringCtx.shadowColor = color;
+            stringCtx.beginPath();
+            stringCtx.arc(point.x, point.y, bulbSize, 0, Math.PI * 2);
+            stringCtx.fill();
+
+            // Малюємо блиск на лампочці
+            stringCtx.shadowBlur = 0;
+            stringCtx.fillStyle = 'rgba(255, 255, 255, ' + (brightness * 0.8) + ')';
+            stringCtx.beginPath();
+            stringCtx.arc(point.x - bulbSize * 0.3, point.y - bulbSize * 0.3, bulbSize * 0.4, 0, Math.PI * 2);
+            stringCtx.fill();
+        }
+
+        stringCtx.globalAlpha = 1;
+        stringCtx.shadowBlur = 0;
     }
 
     // Оновлення динаміки цукерки
@@ -637,92 +910,93 @@
     }
 
     // Малювання конфетті
-    function drawConfetti(particle) {
-        ctx.save();
-        ctx.translate(particle.x, particle.y);
-        ctx.rotate(particle.rotation * Math.PI / 180);
-        ctx.globalAlpha = particle.opacity;
-        ctx.fillStyle = particle.color;
-        ctx.strokeStyle = particle.color;
-        ctx.lineWidth = 2;
+    function drawConfetti(particle, context) {
+        context.save();
+        context.translate(particle.x, particle.y);
+        context.rotate(particle.rotation * Math.PI / 180);
+        context.globalAlpha = particle.opacity;
+        context.fillStyle = particle.color;
+        context.strokeStyle = particle.color;
+        context.lineWidth = 2;
 
         const size = particle.size;
 
         switch(particle.shape) {
             case 'circle':
-                ctx.beginPath();
-                ctx.arc(0, 0, size, 0, Math.PI * 2);
-                ctx.fill();
+                context.beginPath();
+                context.arc(0, 0, size, 0, Math.PI * 2);
+                context.fill();
                 break;
 
             case 'square':
-                ctx.fillRect(-size, -size, size * 2, size * 2);
+                context.fillRect(-size, -size, size * 2, size * 2);
                 break;
 
             case 'triangle':
-                ctx.beginPath();
-                ctx.moveTo(0, -size * 1.2);
-                ctx.lineTo(size * 1.2, size * 1.2);
-                ctx.lineTo(-size * 1.2, size * 1.2);
-                ctx.closePath();
-                ctx.fill();
+                context.beginPath();
+                context.moveTo(0, -size * 1.2);
+                context.lineTo(size * 1.2, size * 1.2);
+                context.lineTo(-size * 1.2, size * 1.2);
+                context.closePath();
+                context.fill();
                 break;
 
             case 'star':
-                drawStar(0, 0, 5, size * 1.3, size * 0.6);
+                drawStar(context, 0, 0, 5, size * 1.3, size * 0.6);
                 break;
 
             case 'heart':
-                drawHeart(size);
+                drawHeart(context, size);
                 break;
 
             case 'diamond':
-                ctx.beginPath();
-                ctx.moveTo(0, -size * 1.3);
-                ctx.lineTo(size * 0.8, 0);
-                ctx.lineTo(0, size * 1.3);
-                ctx.lineTo(-size * 0.8, 0);
-                ctx.closePath();
-                ctx.fill();
+                context.beginPath();
+                context.moveTo(0, -size * 1.3);
+                context.lineTo(size * 0.8, 0);
+                context.lineTo(0, size * 1.3);
+                context.lineTo(-size * 0.8, 0);
+                context.closePath();
+                context.fill();
                 break;
         }
 
-        ctx.restore();
+        context.restore();
     }
 
-    function drawStar(cx, cy, spikes, outerRadius, innerRadius) {
+    function drawStar(context, cx, cy, spikes, outerRadius, innerRadius) {
         let rot = Math.PI / 2 * 3;
         const step = Math.PI / spikes;
-        ctx.beginPath();
-        ctx.moveTo(cx, cy - outerRadius);
+        context.beginPath();
+        context.moveTo(cx, cy - outerRadius);
 
         for (let i = 0; i < spikes; i++) {
             let x = cx + Math.cos(rot) * outerRadius;
             let y = cy + Math.sin(rot) * outerRadius;
-            ctx.lineTo(x, y);
+            context.lineTo(x, y);
             rot += step;
             x = cx + Math.cos(rot) * innerRadius;
             y = cy + Math.sin(rot) * innerRadius;
-            ctx.lineTo(x, y);
+            context.lineTo(x, y);
             rot += step;
         }
-        ctx.lineTo(cx, cy - outerRadius);
-        ctx.closePath();
-        ctx.fill();
+        context.lineTo(cx, cy - outerRadius);
+        context.closePath();
+        context.fill();
     }
 
-    function drawHeart(size) {
-        ctx.beginPath();
-        ctx.moveTo(0, size * 0.3);
-        ctx.bezierCurveTo(-size * 1.2, -size * 0.6, -size * 1.8, size * 0.5, 0, size * 1.5);
-        ctx.bezierCurveTo(size * 1.8, size * 0.5, size * 1.2, -size * 0.6, 0, size * 0.3);
-        ctx.closePath();
-        ctx.fill();
+    function drawHeart(context, size) {
+        context.beginPath();
+        context.moveTo(0, size * 0.3);
+        context.bezierCurveTo(-size * 1.2, -size * 0.6, -size * 1.8, size * 0.5, 0, size * 1.5);
+        context.bezierCurveTo(size * 1.8, size * 0.5, size * 1.2, -size * 0.6, 0, size * 0.3);
+        context.closePath();
+        context.fill();
     }
 
     // Головний цикл анімації
     function animate() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        modalConfettiCtx.clearRect(0, 0, modalConfettiCanvas.width, modalConfettiCanvas.height);
 
         if (!isDragging) {
             if (Math.abs(velocityX) > 0.01 || Math.abs(velocityY) > 0.01) {
@@ -768,7 +1042,7 @@
         updateString();
         drawString();
 
-        // Оновлення конфетті
+        // Оновлення основного конфетті
         confetti = confetti.filter(particle => {
             particle.vy += particle.gravity;
             particle.vx += particle.wobble * 0.05;
@@ -777,16 +1051,37 @@
             particle.rotation += particle.rotationSpeed;
             particle.life--;
 
-            if (particle.life < 90) {
-                particle.opacity = particle.life / 90;
+            if (particle.life < 150) {
+                particle.opacity = particle.life / 150;
             }
 
-            drawConfetti(particle);
+            drawConfetti(particle, ctx);
 
             return particle.life > 0 &&
                 particle.y < canvas.height + 100 &&
                 particle.x > -100 &&
                 particle.x < canvas.width + 100;
+        });
+
+        // Оновлення модального конфетті
+        modalConfetti = modalConfetti.filter(particle => {
+            particle.vy += particle.gravity;
+            particle.vx += particle.wobble * 0.05;
+            particle.x += particle.vx;
+            particle.y += particle.vy;
+            particle.rotation += particle.rotationSpeed;
+            particle.life--;
+
+            if (particle.life < 200) {
+                particle.opacity = particle.life / 200;
+            }
+
+            drawConfetti(particle, modalConfettiCtx);
+
+            return particle.life > 0 &&
+                particle.y < modalConfettiCanvas.height + 100 &&
+                particle.x > -100 &&
+                particle.x < modalConfettiCanvas.width + 100;
         });
 
         requestAnimationFrame(animate);
