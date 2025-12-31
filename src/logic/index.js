@@ -27,13 +27,16 @@ if (isMobile) {
 }
 
 const garlandColors = [
-    '#FF0000', '#00FF00', '#0080FF', '#FFD700',
-    '#FF00FF', '#00FFFF', '#FFFF00', '#FF6600'
+    '#FF0040', '#FF1493', '#FF69B4', '#FF4500',
+    '#FFD700', '#FFFF00', '#00FF00', '#00FFFF',
+    '#0080FF', '#4169E1', '#8B00FF', '#FF00FF',
+    '#FF6347', '#32CD32', '#00CED1', '#FF1493',
+    '#FFD700', '#FF8C00', '#00FF7F', '#7B68EE'
 ];
 
 const lightColors = [];
 
-for (let i = 0; i <= 30; i++) {
+for (let i = 0; i <= 255; i++) {
     lightColors.push(garlandColors[i % garlandColors.length]);
 }
 
