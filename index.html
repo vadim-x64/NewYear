@@ -9,6 +9,7 @@
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            user-select: none;
         }
 
         body {
@@ -17,6 +18,16 @@
             font-family: Arial, sans-serif;
             cursor: default;
             position: relative;
+        }
+
+        #backgroundVideo {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 0;
         }
 
         #canvas {
@@ -28,6 +39,7 @@
         }
 
         #stringCanvas {
+            width: 100%;
             position: absolute;
             top: 0;
             left: 0;
@@ -37,16 +49,9 @@
 
         .anchor {
             position: absolute;
-            top: 0;
-            width: 30px;
-            height: 30px;
-            background: radial-gradient(circle, #ffd700 0%, #daa520 100%);
-            border-radius: 50%;
             transform: translate(-50%, -50%);
             pointer-events: none;
             z-index: 2;
-            box-shadow: 0 2px 10px rgba(255, 215, 0, 0.6);
-            border: 3px solid #b8860b;
         }
 
         .candy-container {
@@ -71,9 +76,151 @@
             height: 100%;
             object-fit: cover;
         }
+
+        #modalOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.75);
+            z-index: 100;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            animation: fadeIn 0.5s ease-in-out;
+            cursor: pointer;
+        }
+
+        #modalOverlay.show {
+            display: flex;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        #wishCard {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            height: 100vh;
+            animation: slideIn 0.6s ease-out;
+            cursor: default;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #modalImageContainer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #modalBackgroundImage {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            object-position: center;
+        }
+
+        #wishContent {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            width: 50%;
+            height: 100%;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(-100px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        #wishCard h2 {
+            color: #ffd700;
+            font-size: 36px;
+            text-align: center;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            font-weight: bold;
+            margin-top: 20px;
+        }
+
+        #wishText {
+            color: #ffffff;
+            font-size: clamp(14px, 2vw, 22px);
+            line-height: 1.5;
+            display: flex;
+            text-align: center;
+            align-items: center;
+            max-width: 100%;
+            height: 100%;
+            text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5);
+            overflow-wrap: break-word;
+        }
+
+        #closeHint {
+            position: absolute;
+            bottom: 200px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 14px;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.5s;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+            z-index: 2;
+        }
+
+        #closeHint.show {
+            opacity: 1;
+        }
+
+        .sparkle {
+            position: absolute;
+            font-size: 30px;
+            animation: sparkleAnim 1.5s infinite;
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        @keyframes sparkleAnim {
+            0%, 100% {
+                opacity: 0;
+                transform: scale(0.5);
+            }
+            50% {
+                opacity: 1;
+                transform: scale(1.2);
+            }
+        }
     </style>
 </head>
 <body>
+<video id="backgroundVideo" autoplay loop muted playsinline preload="metadata">
+    <source src="src/assets/video.mp4" type="video/mp4">
+</video>
 <canvas id="canvas"></canvas>
 <canvas id="stringCanvas"></canvas>
 <div class="anchor" id="anchor"></div>
@@ -85,6 +232,23 @@
          draggable="false">
 </div>
 
+<!-- Модальне вікно -->
+<div id="modalOverlay">
+    <div id="wishCard">
+        <!-- Контейнер для фонового зображення -->
+        <div id="modalImageContainer">
+            <img id="modalBackgroundImage" src="src/assets/modal.png" alt="Новорічна листівка">
+        </div>
+
+        <div id="wishContent">
+            <h2>З Новим 2026 Роком!</h2>
+            <div id="wishText"></div>
+        </div>
+
+        <div id="closeHint">Натисніть на екран, щоб закрити</div>
+    </div>
+</div>
+
 <script>
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
@@ -93,6 +257,24 @@
     const candyContainer = document.getElementById('candyContainer');
     const candyImg = document.getElementById('candyImg');
     const anchor = document.getElementById('anchor');
+
+    // Модальне вікно
+    const modalOverlay = document.getElementById('modalOverlay');
+    const wishText = document.getElementById('wishText');
+    const closeHint = document.getElementById('closeHint');
+
+    // Аудіо для конфетті
+    const confettiSound = new Audio('src/assets/audio.mp3');
+    confettiSound.volume = 0.5;
+
+    // Завантаження побажань
+    let wishes = [];
+    fetch('src/assets/wishes.json')
+        .then(response => response.json())
+        .then(data => {
+            wishes = data.wishes;
+        })
+        .catch(error => console.error('Помилка завантаження побажань:', error));
 
     // Налаштування canvas
     function resizeCanvas() {
@@ -115,6 +297,8 @@
     const angleDamping = 0.996;
 
     const confettiPullThreshold = 100;
+    const confettiCooldown = 3000;
+    let lastConfettiTime = 0;
 
     // Параметри нитки
     const stringSegments = 20;
@@ -152,6 +336,7 @@
     let confetti = [];
     let confettiTriggered = false;
     let wasStretched = false;
+    let confettiAnimationFinished = false;
 
     // Встановлення початкової позиції
     anchor.style.left = anchorX + 'px';
@@ -215,13 +400,26 @@
                 posY += (targetY - posY) * 0.3;
             }
 
-            // Перевірка на конфетті
+            // Перевірка на конфетті з затримкою
+            const currentTime = Date.now();
             const pullDistance = posY - (anchorY + stringLength);
-            if (pullDistance > confettiPullThreshold && !confettiTriggered) {
+            if (pullDistance > confettiPullThreshold && !confettiTriggered &&
+                (currentTime - lastConfettiTime) >= confettiCooldown) {
                 createConfettiBurst();
                 confettiTriggered = true;
+                lastConfettiTime = currentTime;
+                confettiAnimationFinished = false;
                 velocityY = -8;
                 velocityX = (Math.random() - 0.5) * 4;
+
+                // Програємо звук
+                confettiSound.currentTime = 0;
+                confettiSound.play().catch(e => console.log('Audio play failed:', e));
+
+                // Показуємо модальне вікно через 0.5 секунди після початку конфетті
+                setTimeout(() => {
+                    showWishModal();
+                }, 500);
             }
 
             updatePosition();
@@ -310,6 +508,37 @@
         }
     }
 
+    // Показ модального вікна з побажанням
+    function showWishModal() {
+        if (wishes.length === 0) return;
+
+        const randomWish = wishes[Math.floor(Math.random() * wishes.length)];
+        modalOverlay.classList.add('show');
+        wishText.textContent = '';
+        closeHint.classList.remove('show');
+
+        // Ефект друкарської машинки
+        let charIndex = 0;
+        const typewriterInterval = setInterval(() => {
+            if (charIndex < randomWish.length) {
+                wishText.textContent += randomWish[charIndex];
+                charIndex++;
+            } else {
+                clearInterval(typewriterInterval);
+                // Показуємо підказку через 5 секунд
+                setTimeout(() => {
+                    closeHint.classList.add('show');
+                }, 5000);
+            }
+        }, 50);
+    }
+
+    // Закриття модального вікна
+    modalOverlay.addEventListener('click', () => {
+        modalOverlay.classList.remove('show');
+        closeHint.classList.remove('show');
+    });
+
     // Оновлення гнучкої нитки
     function updateString() {
         stringPoints[0].x = anchorX;
@@ -375,9 +604,6 @@
             stringCtx.quadraticCurveTo(p1.x, p1.y, midX, midY);
         }
 
-        // const lastPoint = stringPoints[stringSegments];
-        // stringCtx.lineTo(lastPoint.x, lastPoint.y);
-
         stringCtx.strokeStyle = 'rgba(255, 215, 0, 0.8)';
         stringCtx.lineWidth = 3;
         stringCtx.lineCap = 'round';
@@ -394,11 +620,9 @@
         lastPosX = posX;
         lastPosY = posY;
 
-        // Обчислюємо нахил на основі швидкості
         const targetTilt = moveSpeedX * 2;
         candyTilt += (targetTilt - candyTilt) * 0.15;
 
-        // Обмежуємо нахил
         candyTilt = Math.max(-45, Math.min(45, candyTilt));
     }
 
@@ -409,7 +633,6 @@
         candyContainer.style.left = (posX - 50) + 'px';
         candyContainer.style.top = (posY - 50) + 'px';
 
-        // Застосовуємо тільки нахил
         candyContainer.style.transform = `rotate(${candyTilt - 200}deg)`;
     }
 
